@@ -1,0 +1,3 @@
+# Input rail definitions (Colang format)
+# Blocks harmful, off-topic, or jailbreak prompts before they reach the LLM.
+# Implementation: Part 5

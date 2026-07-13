@@ -1,0 +1,3 @@
+# Output rail definitions (Colang format)
+# Checks each sentence chunk before it reaches TTS — applied per chunk, not full response.
+# Implementation: Part 5

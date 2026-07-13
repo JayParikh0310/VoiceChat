@@ -1,0 +1,17 @@
+# NeMo Guardrails main config
+# Only input + output rails enabled — dialogue rails skipped (latency budget)
+models:
+  - type: main
+    engine: ollama
+    model: qwen2.5:3b
+
+rails:
+  input:
+    flows:
+      - check harmful input
+  output:
+    flows:
+      - check harmful response
+  # dialog rails intentionally omitted
+
+# Implementation: Part 5
