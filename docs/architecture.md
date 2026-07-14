@@ -12,9 +12,9 @@
 - Output: audio chunk when user finishes speaking
 
 ### STT (Speech-to-Text)
-- Tech: faster-whisper (base, int8)
+- Tech: faster-whisper (small, int8, CUDA)
 - Role: Transcribes audio chunk to text
-- Latency target: < 400ms on CPU
+- Latency target: < 400ms — measured 68ms median / 81ms P95 on RTX 4060 Laptop (see `latency_report.md`)
 
 ### LangGraph Agent
 - Tech: LangGraph + Ollama (qwen2.5:3b)

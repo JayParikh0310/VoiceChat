@@ -1,0 +1,28 @@
+[project]
+name = "voicechat"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "faiss-cpu>=1.8.0",
+    "fastapi>=0.115.0",
+    "faster-whisper>=1.0.3",
+    "kokoro>=0.9.4",
+    "langchain>=0.3.0",
+    "langchain-community>=0.3.0",
+    "langgraph>=0.2.0",
+    "nemoguardrails>=0.10.0",
+    "numpy>=1.26.0",
+    "nvidia-cublas-cu12>=12.9.2.10",
+    "nvidia-cudnn-cu12>=9.24.0.43",
+    "ollama>=0.3.0",
+    "pyaudio>=0.2.14",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "python-dotenv>=1.0.0",
+    "pyyaml>=6.0.2",
+    "sentence-transformers>=3.0.0",
+    "torch>=2.3.0",
+    "torchaudio>=2.3.0",
+    "uvicorn[standard]>=0.32.0",
+    "websockets>=13.0",
+]

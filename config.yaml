@@ -18,11 +18,11 @@ vad:
 
 # ─── STT ──────────────────────────────────────────────────────────────────────
 stt:
-  model_size: "base"          # faster-whisper: tiny/base/small/medium
+  model_size: "small"          # faster-whisper: tiny/base/small/medium
   compute_type: "int8"        # int8 = fastest CPU inference
   language: "en"
   beam_size: 1                # lower = faster, slightly less accurate
-  device: "cpu"               # "cpu" or "cuda"
+  device: "cuda"               # "cpu" or "cuda"
 
 # ─── LLM ──────────────────────────────────────────────────────────────────────
 llm:

@@ -1,7 +1,18 @@
 # VoiceChat — CLAUDE.md
 
-## CRITICAL RULE
-**Do NOT write any implementation code unless Jay explicitly says so AND specifies which part/file to implement.** This includes: no function bodies, no class implementations, no logic. Scaffolding (empty files, imports, docstrings, type stubs) is fine when setting up structure. Sprint 0 is about planning and structure only.
+## CRITICAL RULES
+
+**1. No code unless explicitly asked.** Do NOT write any implementation code unless Jay explicitly says so AND specifies which part/file to implement. This includes: no function bodies, no class implementations, no logic. Scaffolding (empty files, imports, docstrings, type stubs) is fine when setting up structure.
+
+**2. After every implementation — give a detailed summary.** After implementing any Part or any file, always provide:
+- A list of every file changed/created
+- For each file: what it does, what the key functions/classes are, and how it connects to the rest of the pipeline
+- Any important implementation decisions made (why a particular approach was chosen)
+- Any config values the user should know about or may want to change
+- What to test to verify it works
+- What Part comes next and what it depends on
+
+**3. Document finished work into `docs/` proactively — don't ask first.** Whenever a Part (or a meaningful chunk of one) is verified working — tests passing, benchmarks run, a milestone hit — write it up into the relevant `docs/` file (`latency_report.md`, `architecture.md`, `tradeoffs.md`, `ai_usage.md`, etc.) immediately, without waiting to be asked. This includes moving/creating planning or reference docs (like `implementation_plan.md`) into `docs/` when they're project documentation rather than private working notes. Exception: files already marked private in `.gitignore` (`CLAUDE.md`, `notes.md`) stay out of `docs/` and out of git.
 
 ---
 
