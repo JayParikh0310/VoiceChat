@@ -42,7 +42,14 @@ memory:
     facts_db_path: "data/memory/facts.sqlite"
     embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
     top_k: 3                  # how many facts to retrieve per query
-    similarity_threshold: 0.6 # minimum cosine similarity to include a fact
+    similarity_threshold: 0.15 # minimum cosine similarity to include a fact
+    # Was 0.6, recalibrated in Part 3 testing. Facts are stored in third person
+    # ("The user works as...") but real queries are first person ("what's my job?"),
+    # and all-MiniLM-L6-v2 scores that pairing much lower than surface similarity
+    # would suggest — genuine first-person-query matches measured ~0.21-0.39, while
+    # unrelated first-person queries measured ~0.0-0.09 against the same fact. 0.15
+    # sits in the gap between those two clusters with margin on both sides. See
+    # docs/tradeoffs.md for the full measurements.
 
 # ─── TTS ──────────────────────────────────────────────────────────────────────
 tts:
