@@ -34,7 +34,8 @@ class AudioManager:
 
         self._pa = pyaudio.PyAudio()
         self._mic_stream: pyaudio.Stream | None = None
-        # _out_stream added in Part 4
+        self._out_stream: pyaudio.Stream | None = None
+        self._out_sample_rate: int | None = None
 
     @property
     def sample_rate(self) -> int:
@@ -98,13 +99,50 @@ class AudioManager:
             self._mic_stream = None
             logger.info("Mic stream closed.")
 
-    # ── Speaker playback — added in Part 4 ─────────────────────────────────────
+    # ── Speaker playback ─────────────────────────────────────────────────────
+
+    def open_speaker(self, sample_rate: int) -> None:
+        """Open the speaker output stream at sample_rate. Idempotent for a matching
+        rate; reopens if a different rate is requested (TTS engines have a fixed
+        native rate, e.g. Kokoro's 24kHz, independent of the 16kHz mic/STT rate).
+        """
+        if self._out_stream is not None:
+            if self._out_sample_rate == sample_rate:
+                return
+            self.close_speaker()
+        self._out_stream = self._pa.open(
+            format=pyaudio.paFloat32,
+            channels=self._channels,
+            rate=sample_rate,
+            output=True,
+            output_device_index=self._output_device,
+        )
+        self._out_sample_rate = sample_rate
+        logger.info(
+            "Speaker opened — device=%s  rate=%dHz",
+            self._output_device or "default",
+            sample_rate,
+        )
+
+    def play_audio(self, pcm: np.ndarray, sample_rate: int) -> None:
+        """Blocking write of float32 PCM audio ([-1.0, 1.0], mono) to the speaker."""
+        self.open_speaker(sample_rate)
+        self._out_stream.write(pcm.astype(np.float32).tobytes())
+
+    def close_speaker(self) -> None:
+        if self._out_stream is not None:
+            self._out_stream.stop_stream()
+            self._out_stream.close()
+            self._out_stream = None
+            self._out_sample_rate = None
+            logger.info("Speaker stream closed.")
 
     # ── Lifecycle ──────────────────────────────────────────────────────────────
 
     def close(self) -> None:
         """Release all audio resources."""
         self.close_mic()
+        self.close_speaker()
         self._pa.terminate()
 
     def __enter__(self) -> AudioManager:

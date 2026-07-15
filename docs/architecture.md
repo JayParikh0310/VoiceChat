@@ -35,8 +35,10 @@
 - Scope: input + output rails only (no dialogue rails — latency budget)
 
 ### TTS (Text-to-Speech)
-- Tech: Kokoro-82M (primary), Piper (fallback)
-- Sentence-level streaming: first sentence plays while LLM generates the second
+- Tech: Kokoro-82M via `audio/tts.py`'s `KokoroTTS` — 24kHz output, independent of the 16kHz mic/STT rate (`AudioManager.play_audio()`/`open_speaker()` open the output stream at whatever rate the TTS engine reports, reopening only if the rate changes). Piper (fallback) is config-selectable (`create_tts_engine()`) but not implemented — `piper-tts` isn't installed and wasn't needed once Kokoro's CUDA issue was fixed; raises `NotImplementedError` if selected.
+- `SentenceChunker`: regex-based (`[.!?]\s`) boundary detection on the raw token stream. Requires punctuation *followed by whitespace*, which avoids false-splitting decimals ("3.14") but does split mid-sentence abbreviations ("Dr. Smith") — an accepted simplification, not full NLP sentence segmentation. See `tradeoffs.md`.
+- `SentenceStreamPlayer`: the overlap orchestrator — a producer coroutine feeds tokens into the chunker and queues completed sentences; a consumer coroutine pulls off that queue and does synthesis + playback (each wrapped in `asyncio.to_thread` since both Kokoro inference and PyAudio writes are blocking calls). The two run concurrently via `asyncio.gather`, so sentence 2 can be synthesizing while sentence 1 is still playing.
+- Measured (CUDA torch): ~100-170ms per average sentence. On CPU-only torch this was 1200-1500ms/sentence — see `latency_report.md`'s CUDA runtime gap note for why, and the fix.
 
 ### Fallback Manager
 - Fires filler phrases if LLM first-token latency > 800ms
