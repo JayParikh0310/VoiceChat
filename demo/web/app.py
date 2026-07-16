@@ -53,7 +53,7 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    pipeline.close()
+    await pipeline.close()
 
 
 app = FastAPI(lifespan=lifespan)

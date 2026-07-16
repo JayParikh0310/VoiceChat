@@ -11,6 +11,7 @@ from typing import Callable
 import numpy as np
 
 from agent.graph import build_graph
+from agent.nodes import wait_for_background_tasks
 from agent.state import AgentState
 from audio.audio_io import AudioIO
 from audio.audio_manager import AudioManager
@@ -98,9 +99,15 @@ class ConversationPipeline:
         except KeyboardInterrupt:
             logger.info("Interrupted — shutting down.")
         finally:
-            self.close()
+            await self.close()
 
-    def close(self) -> None:
+    async def close(self) -> None:
+        """Waits for any in-flight extract_memory_node background task before
+        releasing audio resources — otherwise stopping the process shortly
+        after a turn silently loses that turn's long-term-memory write (see
+        docs/tradeoffs.md).
+        """
+        await wait_for_background_tasks()
         self.audio_manager.close()
 
     # ── One turn ───────────────────────────────────────────────────────────────

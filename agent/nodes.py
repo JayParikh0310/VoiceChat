@@ -24,6 +24,25 @@ logger = logging.getLogger(__name__)
 _background_tasks: set[asyncio.Task] = set()
 
 
+async def wait_for_background_tasks(timeout: float = 5.0) -> None:
+    """Wait for any in-flight extract_memory_node tasks to finish before the
+    process exits. Without this, stopping the server (Ctrl+C, --reload
+    restart, closing the web app) shortly after a turn kills the fact write
+    before it commits — the fact is silently lost even though extraction and
+    storage both work correctly. Bounded by timeout so a genuinely stuck
+    task can't hang shutdown forever. Called from ConversationPipeline.close().
+    """
+    if not _background_tasks:
+        return
+    logger.info("Waiting for %d in-flight memory-extraction task(s) before shutdown...", len(_background_tasks))
+    _, pending = await asyncio.wait(_background_tasks, timeout=timeout)
+    if pending:
+        logger.warning(
+            "%d memory-extraction task(s) still running after %.0fs — proceeding with shutdown anyway",
+            len(pending), timeout,
+        )
+
+
 def make_generate_node(config: dict) -> Callable[[AgentState], Awaitable[dict]]:
     """Build generate_node, closing over one reused AsyncClient + the configured
     model/options so they're created once at graph-build time, not per turn.
@@ -31,6 +50,7 @@ def make_generate_node(config: dict) -> Callable[[AgentState], Awaitable[dict]]:
     llm_cfg = config["llm"]
     client = ollama.AsyncClient(host=llm_cfg["base_url"])
     model: str = llm_cfg["model"]
+    keep_alive = llm_cfg.get("keep_alive")
     options = {
         "temperature": llm_cfg["temperature"],
         "num_predict": llm_cfg["max_tokens"],
@@ -63,6 +83,7 @@ def make_generate_node(config: dict) -> Callable[[AgentState], Awaitable[dict]]:
             messages=request_messages,
             stream=True,
             options=options,
+            keep_alive=keep_alive,
         )
         async for part in stream:
             token = part["message"]["content"]
@@ -116,6 +137,7 @@ def make_extract_memory_node(
     llm_cfg = config["llm"]
     client = ollama.AsyncClient(host=llm_cfg["base_url"])
     model: str = llm_cfg["model"]
+    keep_alive = llm_cfg.get("keep_alive")
 
     async def _classify_and_store(user_text: str) -> None:
         try:
@@ -126,12 +148,22 @@ def make_extract_memory_node(
                     {"role": "user", "content": build_extraction_prompt(user_text)},
                 ],
                 stream=False,
-                options={"temperature": 0.0, "num_predict": 60},
+                # num_predict raised from 60->120: a single fact fits in 60 tokens, but
+                # a turn with two or three distinct facts (one per line, per the
+                # multi-fact prompt revision) needs the extra headroom.
+                options={"temperature": 0.0, "num_predict": 120},
+                keep_alive=keep_alive,
             )
-            fact = response["message"]["content"].strip()
-            if fact and fact.upper().rstrip(".") != "NONE":
-                await asyncio.to_thread(long_term.store_fact, fact)
-                logger.info("Memory extracted: '%s'", fact)
+            raw = response["message"]["content"].strip()
+            facts = [
+                line.strip()
+                for line in raw.splitlines()
+                if line.strip() and line.strip().upper().rstrip(".") != "NONE"
+            ]
+            if facts:
+                for fact in facts:
+                    await asyncio.to_thread(long_term.store_fact, fact)
+                    logger.info("Memory extracted: '%s'", fact)
             else:
                 logger.debug("Memory extraction: nothing worth storing this turn")
         except Exception:

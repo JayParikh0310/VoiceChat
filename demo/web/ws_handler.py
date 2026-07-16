@@ -57,16 +57,21 @@ class WebSocketAudioIO:
         self._loop: asyncio.AbstractEventLoop | None = None
         self._inbound: queue.Queue = queue.Queue()
         self._spoke_this_turn = False
+        # True while the assistant's own TTS audio is playing (or has just
+        # finished) this turn. The browser streams mic audio continuously,
+        # including while the speakers are playing the response — with no
+        # echo cancellation, the mic picks up the assistant's own voice.
+        # Without this gate, that gets queued during playback and fed to VAD
+        # as the "next" utterance the moment listening resumes, so the
+        # assistant ends up responding to itself in a runaway chain. See
+        # docs/tradeoffs.md.
+        self._discard_incoming = False
 
     def attach(self, websocket: WebSocket, input_sample_rate: int) -> None:
         self._websocket = websocket
         self._loop = asyncio.get_running_loop()
-        # Drop any stale chunks left over from a previous session.
-        while not self._inbound.empty():
-            try:
-                self._inbound.get_nowait()
-            except queue.Empty:
-                break
+        self._discard_incoming = False
+        self._drain_inbound()
 
     def detach(self) -> None:
         self._websocket = None
@@ -74,14 +79,29 @@ class WebSocketAudioIO:
         self._inbound.put(_DISCONNECT_SENTINEL)
 
     def begin_turn(self) -> None:
-        """Call once per turn, before pipeline.run_turn(), so play_audio()
-        knows to announce a 'speaking' status on its first call this turn.
+        """Call once per turn, before pipeline.run_turn(): resets the
+        'speaking' status flag and, critically, drops any audio that was
+        captured (and queued) while the previous turn's response was
+        playing, then re-opens the gate so this turn can actually listen.
         """
         self._spoke_this_turn = False
+        self._discard_incoming = False
+        self._drain_inbound()
+
+    def _drain_inbound(self) -> None:
+        while not self._inbound.empty():
+            try:
+                self._inbound.get_nowait()
+            except queue.Empty:
+                break
 
     def push_chunk(self, chunk: np.ndarray) -> None:
         """Called from the event loop (the receive loop) with an
-        already-resampled 16kHz chunk."""
+        already-resampled 16kHz chunk. Dropped, not queued, while the
+        assistant is speaking — see _discard_incoming above.
+        """
+        if self._discard_incoming:
+            return
         self._inbound.put(chunk)
 
     # ── AudioIO shape ─────────────────────────────────────────────────────────
@@ -109,6 +129,8 @@ class WebSocketAudioIO:
         loop = self._loop
         if websocket is None or loop is None:
             return  # session already ended — nothing to play to
+
+        self._discard_incoming = True
 
         async def _send() -> None:
             if not self._spoke_this_turn:
