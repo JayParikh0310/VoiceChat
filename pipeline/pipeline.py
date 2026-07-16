@@ -238,11 +238,32 @@ class ConversationPipeline:
         either it or the refusal line in its place. Returns whichever was
         actually spoken, so callers store the true spoken text, not the
         (possibly blocked) original.
+
+        Runs the guardrail check concurrently with synthesizing `text`,
+        instead of sequentially (Part 9 optimization) — the check typically
+        takes longer than synthesis (~300-1000ms vs. ~100-400ms measured
+        throughout this project), so overlapping them hides most of
+        synthesis behind the check instead of stacking the two costs. The
+        tradeoff: on the rare sentence that gets blocked, the synthesized
+        audio for `text` is thrown away and the refusal line has to be
+        synthesized separately — cheap wasted GPU work on an uncommon path,
+        in exchange for real latency savings on every sentence. See
+        docs/tradeoffs.md.
         """
-        result = await self.guardrails.check_output(text)
-        spoken = text if result.allowed else result.message
-        await self._speak_raw(spoken, on_synthesized=on_synthesized)
-        return spoken
+        check_task = asyncio.create_task(self.guardrails.check_output(text))
+        synth_task = asyncio.create_task(asyncio.to_thread(self.tts.synthesize, text))
+        result, pcm = await asyncio.gather(check_task, synth_task)
+
+        if on_synthesized is not None:
+            on_synthesized()
+
+        if result.allowed:
+            await asyncio.to_thread(self.audio_manager.play_audio, pcm, self.tts.sample_rate)
+            return text
+
+        refusal_pcm = await asyncio.to_thread(self.tts.synthesize, result.message)
+        await asyncio.to_thread(self.audio_manager.play_audio, refusal_pcm, self.tts.sample_rate)
+        return result.message
 
     async def _speak_raw(self, text: str, on_synthesized: Callable[[], None] | None = None) -> None:
         """Synthesize + play text with no guardrail check — for text this
