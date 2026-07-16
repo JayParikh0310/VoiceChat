@@ -89,3 +89,11 @@ logging:
   level: "INFO"               # DEBUG for development, INFO for demo
   log_latency: true           # print per-stage timing to console
   log_file: null              # null = console only
+
+# ─── Web Demo (Part 8, stretch) ────────────────────────────────────────────────
+web:
+  host: "127.0.0.1"           # localhost only — single-user demo, no need for 0.0.0.0
+  port: 8000
+  static_dir: "demo/web/static"
+  mic_frame_ms: 32            # ms of audio batched per outbound binary WS frame from the browser
+  max_concurrent_sessions: 1  # reject a 2nd simultaneous WS connection rather than corrupt shared VAD/memory state

@@ -43,15 +43,27 @@ class LatencyMonitor:
         """ms since start_turn() at the time `stage` was marked, or None if unmarked."""
         return self._marks.get(stage)
 
+    def stage_durations(self) -> dict[str, float]:
+        """Per-stage duration in ms (not cumulative), derived from the gap
+        between consecutive marks — the same computation log_summary() uses
+        for its printed breakdown, exposed here structured for callers that
+        want the numbers themselves (e.g. Part 8's web demo, to send a
+        latency readout to the browser) instead of a formatted log line.
+        """
+        durations: dict[str, float] = {}
+        previous = 0.0
+        for stage, cumulative in self._marks.items():
+            durations[stage] = cumulative - previous
+            previous = cumulative
+        return durations
+
     def log_summary(self) -> None:
         """Log a per-stage duration breakdown, gated on config.logging.log_latency."""
         if not self._log_latency or not self._marks:
             return
 
-        parts = []
-        previous = 0.0
-        for stage, cumulative in self._marks.items():
-            parts.append(f"{stage}: {cumulative - previous:.0f}ms")
-            previous = cumulative
-        parts.append(f"total: {previous:.0f}ms")
+        durations = self.stage_durations()
+        total = sum(durations.values())
+        parts = [f"{stage}: {duration:.0f}ms" for stage, duration in durations.items()]
+        parts.append(f"total: {total:.0f}ms")
         logger.info("[%s]", " | ".join(parts))

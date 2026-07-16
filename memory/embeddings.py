@@ -4,7 +4,19 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
+
+# huggingface_hub (used internally by SentenceTransformer) makes a live HEAD
+# request to check for a PEFT adapter config on every load, even when the
+# model is already fully downloaded and cached locally — and raises instead
+# of falling back to the cache if that request fails. This violates this
+# project's "no runtime network calls" offline requirement (CLAUDE.md) and
+# was caught when a real network outage crashed pipeline startup entirely
+# (see docs/tradeoffs.md decision 28). setdefault so an explicit override
+# (e.g. to force a fresh download) still works if ever needed.
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 
 import numpy as np
 from sentence_transformers import SentenceTransformer

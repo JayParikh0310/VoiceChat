@@ -1,1 +1,136 @@
 /* Web UI styles — Implementation: Part 8 (stretch goal) */
+
+:root {
+  --bg: #120404;
+  --red: #e0263f;
+  --red-bright: #ff3b52;
+  --red-dim: #5c1520;
+  --text: #f5e6e6;
+  --text-dim: #b98b8f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: radial-gradient(circle at 50% 40%, #24070a 0%, var(--bg) 70%);
+  color: var(--text);
+  font-family: "Segoe UI", system-ui, sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+#session-btn {
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  border: 3px solid var(--red);
+  background: radial-gradient(circle, var(--red-dim) 0%, #300a10 100%);
+  color: var(--red-bright);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 30px rgba(224, 38, 63, 0.35);
+  transition: box-shadow 0.3s ease, border-color 0.3s ease, transform 0.2s ease;
+}
+
+#session-btn:hover {
+  transform: scale(1.03);
+}
+
+.mic-icon {
+  width: 56px;
+  height: 56px;
+  fill: currentColor;
+}
+
+#status {
+  font-size: 1.1rem;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  min-height: 1.4em;
+}
+
+#latency {
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 0.75rem;
+  color: var(--red-dim);
+  background: #1a0608;
+  border: 1px solid var(--red-dim);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  max-width: 90vw;
+  white-space: pre-wrap;
+  text-align: center;
+}
+
+/* ── State-driven button appearance ─────────────────────────────────────── */
+
+#session-btn[data-state="listening"] {
+  border-color: var(--red-bright);
+  animation: pulse-listening 1.6s ease-in-out infinite;
+}
+
+#session-btn[data-state="processing"] {
+  border-color: var(--text-dim);
+  color: var(--text-dim);
+  animation: pulse-processing 0.9s ease-in-out infinite;
+}
+
+#session-btn[data-state="speaking"] {
+  border-color: var(--red-bright);
+  color: var(--red-bright);
+  animation: pulse-speaking 0.5s ease-in-out infinite;
+}
+
+#session-btn[data-state="error"] {
+  border-color: #ff7a3d;
+  color: #ff7a3d;
+  box-shadow: 0 0 30px rgba(255, 122, 61, 0.5);
+}
+
+@keyframes pulse-listening {
+  0%,
+  100% {
+    box-shadow: 0 0 25px rgba(224, 38, 63, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 45px rgba(255, 59, 82, 0.65);
+  }
+}
+
+@keyframes pulse-processing {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes pulse-speaking {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}

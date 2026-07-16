@@ -26,8 +26,19 @@ rails:
 # policies scored noticeably worse against qwen2.5:3b (see docs/tradeoffs.md),
 # consistent with the same few-shot-helps-small-models finding from Part 3's
 # memory-extraction prompt.
+#
+# stop/max_tokens are load-bearing, not cosmetic: without them, qwen2.5:3b
+# occasionally answers with a full explanatory paragraph instead of a bare
+# "Yes"/"No" (still classifies correctly as the first word, but generates
+# 100+ extra tokens doing it) — one measured case took 5069ms instead of the
+# usual ~300ms, found during Part 7's full-pipeline testing. Capping max_tokens
+# and stopping at the first newline makes worst-case latency bounded instead
+# of occasionally blowing the 2-second turn budget on its own. See
+# docs/tradeoffs.md.
 prompts:
   - task: self_check_input
+    max_tokens: 3
+    stop: ["\n"]
     content: |
       Your task is to check if the user message below complies with the policy for talking with a voice assistant.
 
@@ -53,6 +64,8 @@ prompts:
       Answer:
 
   - task: self_check_output
+    max_tokens: 3
+    stop: ["\n"]
     content: |
       Your task is to check if the bot message below complies with the policy for a voice assistant.
 

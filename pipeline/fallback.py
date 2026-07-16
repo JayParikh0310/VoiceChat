@@ -9,7 +9,7 @@ import logging
 import random
 import time
 
-from audio.audio_manager import AudioManager
+from audio.audio_io import AudioIO
 from audio.tts import KokoroTTS
 
 logger = logging.getLogger(__name__)
@@ -33,7 +33,7 @@ class FallbackManager:
     the race + phrase-speaking mechanism in isolation.
     """
 
-    def __init__(self, config: dict, tts_engine: KokoroTTS, audio_manager: AudioManager) -> None:
+    def __init__(self, config: dict, tts_engine: KokoroTTS, audio_manager: AudioIO) -> None:
         fb_cfg = config["fallback"]
         self._timeout_s: float = fb_cfg["llm_first_token_timeout_ms"] / 1000
         self._filler_phrases: list[str] = fb_cfg["filler_phrases"]
