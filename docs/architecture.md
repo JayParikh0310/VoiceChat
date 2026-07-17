@@ -2,7 +2,34 @@
 
 ## Pipeline Flow
 
-[Diagram goes here — see architecture.excalidraw]
+```mermaid
+flowchart TD
+    Mic[Mic Input] --> VAD["VAD — Silero VAD<br/>detects speech start/end"]
+    VAD --> STT["STT — faster-whisper<br/>(small, int8, CUDA)"]
+    STT --> InGuard{"Input Guardrail<br/>NeMo self-check"}
+    InGuard -- blocked --> RefusalTTS["Speak refusal line"] --> Speaker
+    InGuard -- allowed --> Graph
+
+    subgraph Graph["LangGraph Agent"]
+        direction TB
+        Retrieve["retrieve_memory<br/>embed query → FAISS search"] --> Generate["generate<br/>streaming Ollama call (Qwen2.5-3B)"]
+        Generate -.fire-and-forget.-> Extract["extract_memory<br/>async, off critical path"]
+    end
+
+    Generate -- tokens streamed --> Chunker["Sentence Chunker"]
+    Chunker --> OutGuard{"Output Guardrail<br/>NeMo self-check"}
+    OutGuard -- blocked --> Refusal2["Synthesize refusal line"] --> TTS
+    OutGuard -- allowed --> TTS["TTS — Kokoro-82M"]
+    TTS --> Speaker[Speaker Output]
+
+    Fallback["FallbackManager<br/>races LLM first token<br/>fires filler phrase if > 800ms"] -.watches.-> Generate
+    Fallback -. on timeout .-> Speaker
+
+    Extract --> LongTerm[("FAISS + SQLite<br/>long-term facts")]
+    Retrieve --> LongTerm
+```
+
+Generation and speech are **overlapped, not sequential** — a bounded producer/consumer queue (`pipeline.sentence_queue_maxsize`) lets sentence 2 keep generating while sentence 1 is still being guardrail-checked, synthesized, and played. See the "Full Pipeline" section below for why an earlier, simpler sequential version of this was a real bug, not just a simplification.
 
 ## Component Breakdown
 
@@ -60,6 +87,7 @@
 ### Full Pipeline (Part 7)
 - `pipeline/pipeline.py`'s `ConversationPipeline` — owns every component above plus `ShortTermMemory`, and orchestrates one full turn in `run_turn()`: blocking VAD-listen loop (`asyncio.to_thread`) → STT → input guardrail (refusal spoken directly and turn ends early if blocked) → `_generate_and_speak()` (fallback race + LangGraph streaming + output-guardrail-gated sentence-by-sentence TTS) → short-term memory update → `LatencyMonitor.log_summary()`.
 - `_stream_and_speak()` uses the same producer/consumer overlap pattern as `SentenceStreamPlayer` (`asyncio.Queue` + `asyncio.gather(produce(), consume())`), with the output guardrail check added inside the consumer — `SentenceStreamPlayer` itself isn't reused since it has no guardrail hook (see `docs/tradeoffs.md` for why an earlier, simpler sequential-loop version of this method was a real bug: it accidentally lost the overlap, since a plain `async for` loop pauses the token producer while awaiting each sentence's guardrail-check+synthesis+playback).
+- The queue is **bounded** (`config.yaml`'s `pipeline.sentence_queue_maxsize`, default 3) — real backpressure: once full, the producer's `queue.put()` blocks until the consumer (guardrail check + synthesis + real-time playback — the slow side) frees a slot, so LLM generation can't race arbitrarily far ahead of how quickly sentences can actually be spoken. Rarely engages given this project's normal 1-3 sentence responses; added specifically as a small, safe, functionally-real producer-consumer/bounded-buffer demonstration. Proven with a real timing test against the actual unmodified method, not asserted — see `docs/tradeoffs.md` decision 38 for a real measurement subtlety found while writing that test (a blocked `put()` on the *last* item is invisible to naive instrumentation, since there's no subsequent token request for the delay to show up in).
 - `_speak_raw()`/`_speak_guarded()` fire an `on_synthesized` callback right after TTS synthesis completes and *before* the blocking `play_audio()` call — this is where `tts_first_chunk` is actually marked, since `play_audio()` blocks for the sentence's full real-time playback duration; marking after it returns would measure "finished speaking," not "started speaking" (a real bug caught and fixed during Part 7's own latency testing).
 - Turn-level exceptions are caught and logged in `run_forever()`'s loop rather than crashing the session, per CLAUDE.md's "no abrupt silences" requirement — one bad turn shouldn't end the conversation.
 - `main.py` — loads `config.yaml`, configures logging, builds `ConversationPipeline`, calls `prewarm()`, then `run_forever()`.

@@ -60,6 +60,7 @@ class ConversationPipeline:
         self.fallback = FallbackManager(config, self.tts, self.audio_manager)
         self.monitor = LatencyMonitor(config)
         self.short_term = ShortTermMemory(config)
+        self._sentence_queue_maxsize: int = config["pipeline"]["sentence_queue_maxsize"]
 
     # ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -194,9 +195,17 @@ class ConversationPipeline:
         testing. SentenceStreamPlayer itself isn't reused here because it has
         no guardrail-check hook and guardrails must not leak into audio/tts.py
         (see docs/tradeoffs.md).
+
+        The queue is bounded (config's pipeline.sentence_queue_maxsize) --
+        backpressure between the producer and consumer: once it's full, the
+        producer's queue.put() blocks until the consumer (guardrail check +
+        synthesis + real-time playback, the slow side) frees a slot, so a
+        fast-generating LLM can't queue sentences arbitrarily far ahead of
+        how quickly they can actually be spoken. Rarely engages on this
+        project's normal short (1-3 sentence) responses -- see docs/tradeoffs.md.
         """
         chunker = SentenceChunker()
-        queue: asyncio.Queue[str | None] = asyncio.Queue()
+        queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=self._sentence_queue_maxsize)
         spoken_parts: list[str] = []
         first_token_marked = False
         first_chunk_marked = False
