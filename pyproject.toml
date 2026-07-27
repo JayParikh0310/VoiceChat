@@ -37,3 +37,18 @@ torchaudio = { index = "pytorch-cu126" }
 name = "pytorch-cu126"
 url = "https://download.pytorch.org/whl/cu126"
 explicit = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "strict"
+# Suppress deprecation/future warnings that originate inside upstream library
+# code (Kokoro/torch and NeMo Guardrails) — these are not our warnings and
+# cannot be fixed by changing our source files.
+#
+# 1. torch/nn/modules/rnn.py: Kokoro passes dropout=0.2 to a single-layer LSTM.
+# 2. torch/nn/utils/weight_norm.py: Kokoro's istftnet uses the old weight_norm API.
+# 3. nemoguardrails/rails/llm/config.py: NeMo's internal 'nim_url' field rename.
+filterwarnings = [
+    "ignore::UserWarning:torch.nn.modules.rnn",
+    "ignore::FutureWarning:torch.nn.utils.weight_norm",
+    "ignore::DeprecationWarning:nemoguardrails.*",
+]

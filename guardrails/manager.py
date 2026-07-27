@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import time
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -12,6 +13,28 @@ from nemoguardrails import LLMRails, RailsConfig
 from nemoguardrails.actions.actions import ActionResult
 
 logger = logging.getLogger(__name__)
+
+# Suppress two DeprecationWarnings emitted by NeMo Guardrails internals during
+# RailsConfig.from_path() and LLMRails.__init__() — both originate inside
+# nemoguardrails library code we can't change.
+#
+# 1. 'nim_url' field rename warning from nemoguardrails/rails/llm/config.py.
+# 2. 'There is no current event loop' from nemoguardrails/utils.py — NeMo calls
+#    asyncio.get_event_loop() at construction time without a running loop; this
+#    is an internal NeMo asyncio shim that's harmless in practice (the manager
+#    is always used in an async context at call time).
+warnings.filterwarnings(
+    "ignore",
+    message=r"Use 'nim_base_url' instead",
+    category=DeprecationWarning,
+    module=r"nemoguardrails\..*",
+)
+warnings.filterwarnings(
+    "ignore",
+    message=r"There is no current event loop",
+    category=DeprecationWarning,
+    module=r"nemoguardrails\..*",
+)
 
 _INPUT_REFUSAL = "I'm not able to help with that. Let's talk about something else."
 _OUTPUT_REFUSAL = "I'd rather not say that. Let's move on."

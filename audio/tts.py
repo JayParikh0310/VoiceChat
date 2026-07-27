@@ -8,11 +8,36 @@ import asyncio
 import logging
 import re
 import time
+import warnings
 from typing import AsyncIterator, Optional
 
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+# Suppress two deprecation warnings emitted by Kokoro's own model code during
+# KPipeline init — both originate inside kokoro/modules.py and kokoro/istftnet.py
+# calling torch APIs that have since been deprecated. We can't change those
+# library files, so we filter by the exact torch source module.
+#
+# 1. UserWarning from torch/nn/modules/rnn.py — "dropout option adds dropout
+#    after all but last recurrent layer..." (Kokoro passes dropout=0.2 to a
+#    single-layer LSTM; harmless but noisy).
+# 2. FutureWarning from torch/nn/utils/weight_norm.py — "torch.nn.utils.weight_norm
+#    is deprecated in favor of torch.nn.utils.parametrizations.weight_norm"
+#    (Kokoro's istftnet uses the old API).
+warnings.filterwarnings(
+    "ignore",
+    message=r"dropout option adds dropout after all but last recurrent layer",
+    category=UserWarning,
+    module=r"torch\.nn\.modules\.rnn",
+)
+warnings.filterwarnings(
+    "ignore",
+    message=r"`torch\.nn\.utils\.weight_norm` is deprecated",
+    category=FutureWarning,
+    module=r"torch\.nn\.utils\.weight_norm",
+)
 
 # Matches sentence-ending punctuation followed by whitespace — the whitespace
 # requirement is what keeps decimals ("3.14 ") from splitting (no space after

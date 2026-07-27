@@ -6,7 +6,7 @@ No cloud APIs are called at inference time. Speech recognition, the LLM, memory 
 
 ## Demo
 
-- **Video**: [ ]
+- **Video**: [https://drive.google.com/file/d/14tk-MqsvEQfYThMHLtu1S12pDDP_rA6P/view?usp=sharing](https://drive.google.com/file/d/14tk-MqsvEQfYThMHLtu1S12pDDP_rA6P/view?usp=sharing)
 - **Live architecture doc**: [`docs/architecture.md`](docs/architecture.md)
 
 ## What it does
@@ -148,8 +148,8 @@ docs/           Architecture, tradeoffs, latency report, AI-usage disclosure
 
 ## Submission links
 
-- Google Drive folder: [ ]
-- Demo video: [ ]
+- GitHub Repository: [https://github.com/JayParikh0310/VoiceChat](https://github.com/JayParikh0310/VoiceChat)
+- Demo video: [https://drive.google.com/file/d/14tk-MqsvEQfYThMHLtu1S12pDDP_rA6P/view?usp=sharing](https://drive.google.com/file/d/14tk-MqsvEQfYThMHLtu1S12pDDP_rA6P/view?usp=sharing)
 
 ---
 
