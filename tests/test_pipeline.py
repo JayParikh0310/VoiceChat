@@ -87,6 +87,7 @@ class _FakePipelineSelf:
 
     _stream_and_speak = ConversationPipeline._stream_and_speak
     _speak_guarded = ConversationPipeline._speak_guarded
+    _is_stalling_phrase = ConversationPipeline._is_stalling_phrase
 
     def __init__(self, graph, guardrails, tts, audio_manager, monitor, sentence_queue_maxsize: int) -> None:
         self.graph = graph
@@ -176,3 +177,56 @@ async def test_sentence_queue_backpressure_does_not_affect_typical_short_respons
         f"a 3-sentence response should never hit the maxsize=3 bound, expected near-instant "
         f"token production, got {production_time:.3f}s"
     )
+
+
+def test_is_stalling_phrase():
+    """Verify that _is_stalling_phrase correctly identifies stalling phrases."""
+    fake_self = _FakePipelineSelf(None, None, None, None, None, 3)
+    
+    stalling = [
+        "Let me think about that.",
+        "Wait while I process that...",
+        "Give me a second.",
+        "Just a moment.",
+        "Wait a moment.",
+        "Let me check that.",
+        "Let me see.",
+        "One second, let me think."
+    ]
+    for phrase in stalling:
+        assert fake_self._is_stalling_phrase(phrase) is True, f"Failed to detect stalling: {phrase}"
+
+    normal = [
+        "The capital of France is Paris.",
+        "Yes, I can help you with that.",
+        "Checking if a file exists is simple.",
+        "Let's get started.",
+        "Here is the information."
+    ]
+    for phrase in normal:
+        assert fake_self._is_stalling_phrase(phrase) is False, f"Incorrectly flagged normal phrase: {phrase}"
+
+
+@pytest.mark.asyncio
+async def test_first_sentence_stalling_filter():
+    """Verify that a stalling first sentence is discarded, but subsequent ones are kept."""
+    sentences = ["Let me think about that. ", "The capital of France is Paris. ", "It is a beautiful city. "]
+    graph = _TimestampedFakeGraph(sentences)
+    audio_manager = _SlowFakeAudioManager(play_delay_s=0.0)
+    fake_self = _FakePipelineSelf(
+        graph=graph,
+        guardrails=_FakeGuardrails(),
+        tts=_FakeTTS(),
+        audio_manager=audio_manager,
+        monitor=_FakeMonitor(),
+        sentence_queue_maxsize=3,
+    )
+    state = {"messages": [], "transcript": "", "retrieved_facts": [], "response_chunks": []}
+
+    spoken = await fake_self._stream_and_speak(state, asyncio.Event())
+    
+    # The first stalling sentence should be dropped, but the rest kept
+    assert spoken == "The capital of France is Paris. It is a beautiful city."
+    # We should only have synthesized/played 2 sentences, not 3
+    assert audio_manager.play_count == 2
+
